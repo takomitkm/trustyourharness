@@ -221,6 +221,34 @@ pub struct CandidateDto {
     pub insert_text: String,
 }
 
+/// 系统提示上下文服务（≈ DSH ctx.systemPrompt.context）：插件按需注入片段，
+/// 宿主在发送前按注册顺序组装。注册经 Scope 登记为可逆副作用。
+#[derive(Default)]
+pub struct PromptContext {
+    entries: Mutex<Vec<(&'static str, serde_json::Value)>>,
+}
+
+impl PromptContext {
+    pub fn register(&self, plugin: &'static str, value: serde_json::Value) {
+        self.entries
+            .lock()
+            .expect("prompt context mutex")
+            .push((plugin, value));
+    }
+
+    pub fn unregister(&self, plugin: &str) -> bool {
+        let mut entries = self.entries.lock().expect("prompt context mutex");
+        let before = entries.len();
+        entries.retain(|(owner, _)| *owner != plugin);
+        before != entries.len()
+    }
+
+    /// 宿主组装：全部片段（注册顺序）。
+    pub fn contexts(&self) -> Vec<(&'static str, serde_json::Value)> {
+        self.entries.lock().expect("prompt context mutex").clone()
+    }
+}
+
 /// 候选来源服务。
 #[derive(Default)]
 pub struct CompletionSources {
@@ -350,6 +378,8 @@ struct Fiber {
     id: FiberId,
     plugin: &'static str,
     requires: Vec<TypeId>,
+    /// 装载配置（Scope::config 读取；随 Fiber 生命周期）。
+    config: Option<serde_json::Value>,
     status: FiberStatus,
     /// 本 Fiber 提供过的服务类型（回滚时移除，触发下游级联回滚）。
     provided: Vec<TypeId>,
@@ -448,6 +478,28 @@ impl Scope<'_> {
         ));
     }
 
+    /// 装载配置（cordis.patch.yml 的 config 同形；随 Fiber 生命周期，卸载即失效）。
+    pub fn config(&self) -> Option<&serde_json::Value> {
+        self.fiber.config.as_ref()
+    }
+
+    /// 注册系统提示上下文片段（可逆：Fiber 回滚时自动撤销）。
+    pub fn register_prompt_context(&mut self, value: serde_json::Value) {
+        let plugin = self.fiber.plugin;
+        let prompt = self
+            .context
+            .get::<PromptContext>()
+            .expect("built-in service");
+        prompt.register(plugin, value);
+        let prompt_for_disposer = prompt.clone();
+        self.fiber.disposers.push((
+            "prompt-context",
+            Box::new(move || {
+                prompt_for_disposer.unregister(plugin);
+            }),
+        ));
+    }
+
     /// 能力接缝消费：必需的能力（trait 对象服务）缺失时显式报错。
     pub fn capability<T: ?Sized + 'static + Send + Sync>(&self) -> Result<Arc<T>, String> {
         self.context
@@ -461,6 +513,8 @@ impl Scope<'_> {
 pub struct FiberSpec {
     pub plugin: &'static str,
     pub requires: Vec<TypeId>,
+    /// 装载配置（cordis.patch.yml 的 id 定向 config 同形；JSON，宿主层按 id 注入）。
+    pub config: Option<serde_json::Value>,
 }
 
 impl FiberSpec {
@@ -468,6 +522,7 @@ impl FiberSpec {
         FiberSpec {
             plugin,
             requires: Vec::new(),
+            config: None,
         }
     }
 
@@ -522,6 +577,10 @@ impl Loader {
             .provide(Arc::new(EventBus::default()))
             .expect("fresh loader");
         loader
+            .context
+            .provide(Arc::new(PromptContext::default()))
+            .expect("fresh loader");
+        loader
     }
 
     pub fn context(&self) -> &Context {
@@ -562,6 +621,7 @@ impl Loader {
             id: fiber_id,
             plugin: spec.plugin,
             requires: spec.requires,
+            config: spec.config,
             status: FiberStatus::Waiting,
             provided: Vec::new(),
             disposers: Vec::new(),
@@ -737,6 +797,13 @@ fn run_apply(
 }
 
 /// FiberSpec 的便捷构造：声明依赖链（inject）。
+/// 带 config 的 FiberSpec（cordis.patch.yml 的 id 定向 config 同形）。
+pub fn fiber_with_config(plugin: &'static str, config: serde_json::Value) -> FiberSpec {
+    let mut spec = fiber(plugin);
+    spec.config = Some(config);
+    spec
+}
+
 pub fn fiber(plugin: &'static str) -> FiberSpec {
     FiberSpec::new(plugin)
 }
