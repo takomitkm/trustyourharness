@@ -1,0 +1,14 @@
+[package]
+name = "deja-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+composer-plugin-api = { path = "../../crates/composer-plugin-api" }
+serde_json.workspace = true
+
+[[bin]]
+name = "deja-stub"
+path = "src/bin/deja-stub.rs"
