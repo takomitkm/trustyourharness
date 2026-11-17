@@ -1,0 +1,35 @@
+;; composer 插件契约 v0（E5c 冻结）——WASM 插件的宿主接口。
+;;
+;; 现状：载体为 core-wasm（wasm32-unknown-unknown，原始 extern "C" ABI + NUL 结尾
+;; UTF-8 字符串），本文件是**冻结的契约文档**——字段与语义以它为准，将来迁移到
+;; component model（wasm-tools / wit-bindgen 组件）时接口形状不变，仅编码升级
+;; （NUL 字符串 → wit string，i32 ptr → 资源句柄）。
+;;
+;; 语义对齐（cordis）：
+;; - 命令注册表 = Commands 服务的 WASM 面（宿主把 export 映射为 CommandHandler，
+;;   经 Scope::register_command 装载——可逆副作用语义跨载体一致）；
+;; - 宿主向插件只提供 alloc + memory（载荷传入），插件自带全部逻辑（dsh-deja
+;;   同款：重逻辑在插件侧，宿主面很薄）。
+
+package composer:plugin@0.1.0;
+
+interface commands {
+    /// 已注册命令数。
+    command-count: func() -> s32;
+
+    /// 第 index 个命令 id（NUL 结尾 UTF-8，返回线性内存指针）。
+    command-id: func(index: s32) -> s32;
+
+    /// 分配 len 字节（宿主写 id/payload 用；永不回收——插件内存只增，v0 简化）。
+    alloc: func(len: u32) -> u32;
+
+    /// 执行命令：id 与 payload 均为宿主写入的字符串；返回结果 JSON 指针。
+    /// 未知 id 或执行失败：返回 {"error": "..."} JSON（插件侧显式，不抛 trap）。
+    invoke: func(id: s32, payload-ptr: s32, payload-len: s32) -> s32;
+}
+
+world wasm-plugin {
+    /// 插件必须导出线性内存（宿主读写 id/payload/结果）。
+    export memory;
+    export commands;
+}

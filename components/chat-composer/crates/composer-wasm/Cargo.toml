@@ -1,0 +1,12 @@
+[package]
+name = "composer-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "E5c WASM plugin carrier: wasmtime-based loader mapping wasm exports onto Commands (Cordis reversible semantics)"
+
+[dependencies]
+composer-plugin-api = { path = "../composer-plugin-api" }
+wasmtime = { version = "29", default-features = false, features = ["runtime", "cranelift"] }
+serde_json.workspace = true

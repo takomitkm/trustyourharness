@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "plugins/*"]
+exclude = ["plugins/wasm-demo-guest"]
 
 [workspace.package]
 version = "0.1.0"

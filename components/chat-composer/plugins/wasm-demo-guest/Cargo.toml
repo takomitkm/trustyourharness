@@ -1,0 +1,9 @@
+[package]
+name = "wasm-demo-guest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E5c WASM guest plugin: command provider on wasm32-unknown-unknown (no_std + bump allocator)"
+
+[lib]
+crate-type = ["cdylib"]
