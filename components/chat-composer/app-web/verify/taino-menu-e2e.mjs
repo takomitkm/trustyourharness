@@ -52,13 +52,13 @@ await focusEditor();
 await page.keyboard.type("看下 @");
 await page.waitForFunction(() => document.querySelector('[data-testid="candidate-menu"]') !== null, undefined, { timeout: 10000 });
 let items = await menuVisible();
-check("1a @ 触发菜单（5 候选）", items?.length === 5, JSON.stringify(items));
+check("1a @ 菜单（多插件合并 9 候选）", items?.length === 9, JSON.stringify(items));
 check("1b 默认高亮首位", (await highlighted()) === items?.[0], await highlighted());
 
 // 2. 过滤缩窄
-await page.keyboard.type("s1");
+await page.keyboard.type("proj");
 items = await menuVisible();
-check("2 过滤缩窄（s1-alpha.md）", items?.length === 1 && items[0]?.includes("s1-alpha"), JSON.stringify(items));
+check("2 过滤缩窄（project-docs.md）", items?.length === 1 && items[0]?.includes("project-docs"), JSON.stringify(items));
 
 // 3. Enter 接受：不提交 + 替换写回（@s1 → @s1-alpha.md + 补尾空格）
 await page.keyboard.press("Enter");
@@ -66,7 +66,7 @@ await page.waitForTimeout(400);
 let view = await composerView();
 check("3a 接受不提交（KD has_menu）", view.state.submissions.length === 0, JSON.stringify(view.state.submissions));
 const text1 = await editorText();
-check("3b 替换写回 + 补尾空格", text1 === "看下 @s1-alpha.md ", JSON.stringify(text1));
+check("3b 替换写回 + 补尾空格", text1 === "看下 @project-docs.md ", JSON.stringify(text1));
 check("3c 菜单随接受关闭", (await menuVisible()) === null, JSON.stringify(await menuVisible()));
 
 // 4. 重新触发 + ArrowDown 导航 + Esc 关闭

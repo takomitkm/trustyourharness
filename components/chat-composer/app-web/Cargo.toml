@@ -25,6 +25,11 @@ composer-intake = { path = "../crates/composer-intake" }
 composer-reorder = { path = "../crates/composer-reorder" }
 composer-host = { path = "../crates/composer-host" }
 composer-runtime = { path = "../crates/composer-runtime" }
+composer-plugin-api = { path = "../crates/composer-plugin-api" }
+slash-commands = { path = "../plugins/slash-commands" }
+file-completion = { path = "../plugins/file-completion" }
+word-count = { path = "../plugins/word-count" }
+attachment-tools = { path = "../plugins/attachment-tools" }
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 serde_json = "1"

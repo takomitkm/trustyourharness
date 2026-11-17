@@ -129,7 +129,7 @@ if (view.state.submissions.length !== 1) {
   }));
 }
 check("6 菜单点击第 3 项接受（Pick：替换写回，不提交）", view.state.submissions.length === 0
-  && view.state.draft.snapshot.text === "@s1-alpha.md ", JSON.stringify(view.state.draft.snapshot.text));
+  && view.state.draft.snapshot.text === "@meeting-2026-11-14.md ", JSON.stringify(view.state.draft.snapshot.text));
 
 check("7a 零未捕获页面错误", errors.length === 0, JSON.stringify(errors));
 

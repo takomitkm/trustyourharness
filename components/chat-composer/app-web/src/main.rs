@@ -25,6 +25,10 @@ use composer_core::ids::{
 use composer_core::state::{ScopeState, Snapshot};
 use composer_host::{ComposerHost, EffectExecutor};
 use composer_keynav::{decide_enter, EnterDecisionInput};
+use attachment_tools::AttachmentToolsPlugin;
+use file_completion::FileCompletionPlugin;
+use slash_commands::SlashCommandsPlugin;
+use word_count::WordCountPlugin;
 use composer_runtime::{Clock, Event, IdGen, RuntimeConfig};
 use dioxus::prelude::*;
 use futures_util::StreamExt;
@@ -353,38 +357,6 @@ struct MenuView {
     highlight: usize,
 }
 
-/// 演示候选源（TS demo 同款）：@ 文件引用、/ 命令回显。生产宿主在此接真实检索。
-fn demo_provider(
-    kind: composer_completion::TriggerKind,
-    query: &str,
-) -> Vec<composer_completion::Candidate> {
-    use composer_completion::{Candidate, TriggerKind};
-    let source: &[(&str, &str)] = match kind {
-        TriggerKind::Reference => &[
-            ("field-report.md", "@field-report.md"),
-            ("final-notes.md", "@final-notes.md"),
-            ("s1-alpha.md", "@s1-alpha.md"),
-            ("s2-beta.md", "@s2-beta.md"),
-            ("服务器架构.png", "@服务器架构.png"),
-        ],
-        TriggerKind::Slash => &[
-            ("/help 帮助", "/帮助"),
-            ("/clear 清理上下文", "/清理上下文"),
-        ],
-    };
-    let needle = query.to_lowercase();
-    source
-        .iter()
-        .filter(|(label, insert)| {
-            label.to_lowercase().contains(&needle) || insert.to_lowercase().contains(&needle)
-        })
-        .map(|(label, insert)| Candidate {
-            label: (*label).into(),
-            insert_text: (*insert).into(),
-        })
-        .collect()
-}
-
 /// session 状态 → 菜单 UI 投影 + menu_open 旗标同步。
 #[cfg(target_arch = "wasm32")]
 fn sync_menu_view(
@@ -642,11 +614,113 @@ fn app() -> Element {
             }
         }
         let mut session = composer_completion::CompletionSession::new();
+        // E5a：Loader 装载原生插件——候选菜单/命令面从插件贡献读取（不再宿主硬编码）。
+        let mut plugin_loader = composer_plugin_api::Loader::new();
+        #[cfg(target_arch = "wasm32")]
+        {
+            composer_plugin_api::Mountable::mount(&SlashCommandsPlugin, &mut plugin_loader)
+                .expect("mount slash-commands");
+            composer_plugin_api::Mountable::mount(&file_completion::FileCompletionPlugin, &mut plugin_loader)
+                .expect("mount file-completion");
+            composer_plugin_api::Mountable::mount(&attachment_tools::AttachmentToolsPlugin, &mut plugin_loader)
+                .expect("mount attachment-tools");
+            composer_plugin_api::Mountable::mount(&WordCountPlugin, &mut plugin_loader)
+                .expect("mount word-count");
+        }
+        let plugin_commands = plugin_loader.context().get::<composer_plugin_api::Commands>().expect("commands");
+        let plugin_sources = plugin_loader
+            .context()
+            .get::<composer_plugin_api::CompletionSources>()
+            .expect("sources");
+        let demo_provider = move |kind: composer_completion::TriggerKind, query: &str| {
+            // 两个 TriggerKind 是独立类型（completion vs plugin-api）——按变体映射。
+            let kind = match kind {
+                composer_completion::TriggerKind::Reference => composer_plugin_api::TriggerKind::Reference,
+                composer_completion::TriggerKind::Slash => composer_plugin_api::TriggerKind::Slash,
+            };
+            let needle = query.to_lowercase();
+            let mut out = Vec::new();
+            for source in plugin_sources.for_trigger(kind) {
+                for candidate in (source.fetch)(query) {
+                    if candidate.label.to_lowercase().contains(&needle)
+                        || candidate.insert_text.to_lowercase().contains(&needle)
+                    {
+                        out.push(composer_completion::Candidate {
+                            label: candidate.label,
+                            insert_text: candidate.insert_text,
+                        });
+                    }
+                }
+            }
+            out
+        };
         while let Some(ev) = rx.next().await {
             match ev {
                 AppEvent::Runtime(event) => {
                     let was_submit = matches!(event, Event::Submit);
                     let was_edit = matches!(event, Event::Edit { .. });
+                    // E5a：/ 命令面——斜杠开头的 Submit 不进 outbox，改走 Commands（在 dispatch 前拦截）。
+                    #[cfg(target_arch = "wasm32")]
+                    let event = if was_submit && taino_mode {
+                        let draft = host.state().draft.snapshot.text.clone();
+                        if let Some(command_line) = draft.strip_prefix('/') {
+                            let name = match command_line.split_once(' ') {
+                                Some((n, _)) => n,
+                                None => command_line,
+                            };
+                            let command_id = match name {
+                                "help" => Some("slash.help"),
+                                "clear" => Some("slash.clear"),
+                                _ => None,
+                            };
+                            if let Some(command_id) = command_id {
+                                if let Some(handler) = plugin_commands.handler(command_id) {
+                                    if let Ok(result) = handler.invoke(&serde_json::json!({})) {
+                                        if result.get("action").and_then(|v| v.as_str()) == Some("clear-draft") {
+                                            // /clear：编辑器清空（事务），台账无提交。
+                                            let schema = taino_editor_loop.peek().schema().clone();
+                                            let size = doc_content_size(&taino_editor_loop);
+                                            let mut tx = taino_editor_loop.peek().tr();
+                                            tx.transform()
+                                                .replace(0, size, text_slice(&schema, ""), &schema)
+                                                .expect("clear replace");
+                                            let next = taino_editor_loop.peek().apply(tx);
+                                            taino_editor_loop.set(next);
+                                        }
+                                        if let Some(commands) = result.get("commands").and_then(|v| v.as_array()) {
+                                            let list: Vec<String> = commands
+                                                .iter()
+                                                .map(|v| v.as_str().unwrap_or_default().to_string())
+                                                .collect();
+                                            global_eval(&format!(
+                                                "const el = document.querySelector('[data-testid=\"slash-help\"]'); if (el) {{ el.textContent = '命令: ' + {}; el.style.display = 'block'; }}",
+                                                serde_json::to_string(&list).unwrap_or_default()
+                                            ));
+                                        }
+                                        // 命令面：清编辑器文本（/clear 已清；/help 保留原文但按宿主惯例不保留命令行）
+                                        if command_id != "slash.clear" {
+                                            let schema = taino_editor_loop.peek().schema().clone();
+                                            let size = doc_content_size(&taino_editor_loop);
+                                            let mut tx = taino_editor_loop.peek().tr();
+                                            tx.transform()
+                                                .replace(0, size, text_slice(&schema, ""), &schema)
+                                                .expect("help clear replace");
+                                            let next = taino_editor_loop.peek().apply(tx);
+                                            taino_editor_loop.set(next);
+                                        }
+                                        session.dismiss();
+                                        sync_menu_view(&session, &mut menu_view_loop, &menu_open_loop);
+                                        ledger.set(host.state().clone());
+                                        admitting.set(host.is_admitting());
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        event
+                    } else {
+                        event
+                    };
                     // E3b：文本 Edit 携带的 ids 视为空（编辑器只拥有文本）——统一在此
                     // 保留台账现 ids（附件面独立于文本，TS 线同款语义；E2E 4b 实录）。
                     let event = match event {
@@ -722,6 +796,19 @@ fn app() -> Element {
                                 }
                             }
                             sync_menu_view(&session, &mut menu_view_loop, &menu_open_loop);
+                            // E5a：word-count 插件命令（插件贡献，宿主按需调）。
+                            web_sys::console::log_1(&"e3d: wordcount reach".into());
+                            if let Some(handler) = plugin_commands.handler("wordcount.current") {
+                                if let Ok(result) = handler.invoke(&serde_json::json!({ "text": text })) {
+                                    let chars = result.get("chars").and_then(|v| v.as_u64()).unwrap_or(0);
+                                    let words = result.get("words").and_then(|v| v.as_u64()).unwrap_or(0);
+                                    web_sys::console::log_1(&format!("e3d: wordcount {} {}", chars, words).into());
+                                    global_eval(&format!(
+                                        "const el = document.querySelector('[data-testid=\"word-count\"]'); if (el) {{ el.textContent = '{} 字符 / {} 词'; el.style.display = 'block'; }}",
+                                        chars, words,
+                                    ));
+                                }
+                            }
                         }
                     }
                     #[cfg(not(target_arch = "wasm32"))]

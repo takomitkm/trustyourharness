@@ -111,6 +111,15 @@ impl Commands {
         self.handlers.lock().unwrap().get(id).cloned()
     }
 
+    /// 撤销注册（Fiber 卸载的可逆回收面；返回是否存在）。
+    pub fn unregister(&self, id: &str) -> bool {
+        self.handlers
+            .lock()
+            .expect("commands mutex")
+            .remove(id)
+            .is_some()
+    }
+
     pub fn ids(&self) -> Vec<String> {
         self.handlers.lock().unwrap().keys().cloned().collect()
     }
@@ -154,6 +163,14 @@ impl Slots {
     }
 
     /// 某槽位的全部贡献，按 (order, 注册顺序) 稳定排序。
+    /// 撤销某插件的全部视图贡献（Fiber 卸载的可逆回收面）。
+    pub fn unregister_plugin(&self, plugin: &str) -> usize {
+        let mut views = self.views.lock().expect("slots mutex");
+        let before = views.len();
+        views.retain(|view| view.plugin != plugin);
+        before - views.len()
+    }
+
     pub fn slot_views(&self, slot: &str) -> Vec<ViewContribution> {
         let mut views: Vec<ViewContribution> = self
             .views
@@ -213,6 +230,14 @@ pub struct CompletionSources {
 impl CompletionSources {
     pub fn register(&self, source: CompletionSource) {
         self.sources.lock().unwrap().push(source);
+    }
+
+    /// 按名字撤销来源（Fiber 卸载的可逆回收面）。
+    pub fn unregister(&self, name: &str) -> bool {
+        let mut sources = self.sources.lock().expect("completion sources mutex");
+        let before = sources.len();
+        sources.retain(|source| source.name != name);
+        before != sources.len()
     }
 
     pub fn for_trigger(&self, trigger: TriggerKind) -> Vec<CompletionSource> {
@@ -379,6 +404,48 @@ impl Scope<'_> {
         self.context
             .get::<CompletionSources>()
             .expect("built-in service")
+    }
+
+    /// 注册命令（可逆：Fiber 回滚时自动撤销——内建服务注册也是副作用，E5a 实录）。
+    pub fn register_command(&mut self, id: &str, handler: Arc<dyn CommandHandler>) -> Result<(), String> {
+        let commands = self.commands();
+        commands.register(id, handler)?;
+        let id = id.to_string();
+        let commands_for_disposer = commands.clone();
+        self.fiber.disposers.push((
+            "commands",
+            Box::new(move || {
+                commands_for_disposer.unregister(&id);
+            }),
+        ));
+        Ok(())
+    }
+
+    /// 注册候选来源（可逆：按来源名撤销）。
+    pub fn register_completion_source(&mut self, source: CompletionSource) {
+        let sources = self.completion_sources();
+        sources.register(source.clone());
+        let name = source.name.clone();
+        self.fiber.disposers.push((
+            "completion-source",
+            Box::new(move || {
+                sources.unregister(&name);
+            }),
+        ));
+    }
+
+    /// 注册槽位视图（可逆：按插件名撤销全部贡献）。
+    pub fn register_view(&mut self, plugin: &str, view: ViewContribution) {
+        let slots = self.slots();
+        slots.register_view(plugin, view);
+        let plugin = plugin.to_string();
+        let slots_for_disposer = slots.clone();
+        self.fiber.disposers.push((
+            "slots-view",
+            Box::new(move || {
+                slots_for_disposer.unregister_plugin(&plugin);
+            }),
+        ));
     }
 
     /// 能力接缝消费：必需的能力（trait 对象服务）缺失时显式报错。

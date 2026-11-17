@@ -133,12 +133,12 @@ impl composer_plugin_api::Mountable for AttachmentToolsPlugin {
 
     fn mount(&self, loader: &mut Loader) -> Result<FiberId, String> {
         loader.mount(composer_plugin_api::fiber(Self::ID), |scope| {
-            scope.commands().register("attachment.alt.set", Arc::new(SetAltText))?;
-            scope.commands().register("attachment.send-as-file.toggle", Arc::new(ToggleSendAsFile))?;
-            scope.commands().register("attachment.move.backward", Arc::new(MoveAttachment { direction: -1 }))?;
-            scope.commands().register("attachment.move.forward", Arc::new(MoveAttachment { direction: 1 }))?;
+            scope.register_command("attachment.alt.set", Arc::new(SetAltText))?;
+            scope.register_command("attachment.send-as-file.toggle", Arc::new(ToggleSendAsFile))?;
+            scope.register_command("attachment.move.backward", Arc::new(MoveAttachment { direction: -1 }))?;
+            scope.register_command("attachment.move.forward", Arc::new(MoveAttachment { direction: 1 }))?;
 
-            scope.slots().register_view(Self::ID, ViewContribution {
+            scope.register_view(Self::ID, ViewContribution {
                 slot: SlotId(SLOT_CARD_TOOLS.into()),
                 component: "toggle-button".into(),
                 label: "压缩/原图".into(),
@@ -147,7 +147,7 @@ impl composer_plugin_api::Mountable for AttachmentToolsPlugin {
                 order: 10,
                 plugin: String::new(),
             });
-            scope.slots().register_view(Self::ID, ViewContribution {
+            scope.register_view(Self::ID, ViewContribution {
                 slot: SlotId(SLOT_CARD_TOOLS.into()),
                 component: "button".into(),
                 label: "前移".into(),
@@ -156,7 +156,7 @@ impl composer_plugin_api::Mountable for AttachmentToolsPlugin {
                 order: 20,
                 plugin: String::new(),
             });
-            scope.slots().register_view(Self::ID, ViewContribution {
+            scope.register_view(Self::ID, ViewContribution {
                 slot: SlotId(SLOT_CARD_TOOLS.into()),
                 component: "button".into(),
                 label: "后移".into(),
@@ -165,7 +165,7 @@ impl composer_plugin_api::Mountable for AttachmentToolsPlugin {
                 order: 30,
                 plugin: String::new(),
             });
-            scope.slots().register_view(Self::ID, ViewContribution {
+            scope.register_view(Self::ID, ViewContribution {
                 slot: SlotId(SLOT_CARD_BODY.into()),
                 component: "text-input".into(),
                 label: "替代文本".into(),

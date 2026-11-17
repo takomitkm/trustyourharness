@@ -56,11 +56,15 @@ export const INDEX_HTML = String.raw`<!DOCTYPE html>
     .attachment-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .attachment-meta { color: #777; font-size: 0.85rem; }
     .intake-rejection { color: #b3261e; font-size: 0.9rem; margin: 4px 0 0; }
+    .slash-help { background: #f0f4ff; border: 1px solid #b6c8f0; border-radius: 8px; padding: 6px 10px; margin: 8px auto 0; max-width: 640px; font-size: 0.9rem; }
+    .word-count { color: #666; font-size: 0.85rem; margin: 4px 0 0; }
     .lexical-island-placeholder { color: #999; }
   </style>
 </head>
 <body>
   <div id="main"></div>
+  <div class="slash-help" data-testid="slash-help" style="display:none"></div>
+  <div class="word-count" data-testid="word-count" style="display:none"></div>
   <script src="island.js"></script>
   <script type="module">
     import init, { composer_view_json } from './app_web.js';
