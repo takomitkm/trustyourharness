@@ -1,0 +1,21 @@
+{
+  "id": "20261113T194300Z",
+  "title": "E5 插件契约层计划：dsh 插件兼容性调研 → Cordis 契约方案 → 排期落档",
+  "created_at_utc": "2026-11-13T19:43:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 a116a70 作者时间（11-14T03:43+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "a116a70"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。无。"
+}

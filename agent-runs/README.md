@@ -18,4 +18,7 @@ agent-runs/<UTC时间戳>-<短slug>/
   - **台账提交**（把 Run 目录本身收进仓库的那笔提交）：提交信息含 Run ID 即可，
     **不**写入 `related_commits`——提交无法包含自己的 sha，关联靠提交信息回查
     （`git log --grep=<ID>`）
+- **回填条目（backfill）**：`metadata.reconstructed: true`；时间按 `time_basis` 口径
+  （锚点提交作者时间，无锚点者为推定）；prompt 为会话记录复原、留存程度见文末回填说明。
+  台账建立（2026-11-20）之前的重大操作已按此口径补录。
 

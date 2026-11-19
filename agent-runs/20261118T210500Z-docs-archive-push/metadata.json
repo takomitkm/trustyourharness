@@ -1,0 +1,21 @@
+{
+  "id": "20261118T210500Z",
+  "title": "会话存储调研三份存档 + main 4/4 分叉强推收敛",
+  "created_at_utc": "2026-11-18T21:05:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 e03a903 作者时间（11-19T05:05+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "e03a903"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。存档范围（三份文档+证据分级+口径警告）源自用户同会话转贴评审的\"最终存档安排\"节并经用户确认。"
+}

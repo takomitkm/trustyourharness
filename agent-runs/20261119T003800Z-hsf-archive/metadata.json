@@ -1,0 +1,21 @@
+{
+  "id": "20261119T003800Z",
+  "title": "HSF 会话存储：规格原文逐字节存档 + 两页蒸馏（数据结构/协议书）",
+  "created_at_utc": "2026-11-19T00:38:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 6276bce 作者时间（11-19T08:38+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "6276bce"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。第一条与第二条后各附用户转贴的 HSF 外部规格全文（约 2335 行）；全文已逐字节存档于 docs/notes/hsf-spec-1.0-draft-full.md，此处不重复。"
+}

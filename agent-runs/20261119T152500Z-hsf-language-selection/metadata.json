@@ -1,0 +1,21 @@
+{
+  "id": "20261119T152500Z",
+  "title": "HSF 实现语言选型评估及架构决策（Rust 内核裁定 + ADR-001..003）",
+  "created_at_utc": "2026-11-19T15:25:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 8e3b09c 作者时间（11-19T23:25+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "8e3b09c"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。转贴评审全文未归档（非本仓库工作产物），其技术声明当日逐条核实后落档。"
+}

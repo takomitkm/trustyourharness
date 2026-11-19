@@ -1,0 +1,21 @@
+{
+  "id": "20261113T084400Z",
+  "title": "E4 乐观确认：ZCode 重命名会话交互范式转译入 composer + 计划落档（未实现）",
+  "created_at_utc": "2026-11-13T08:44:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 990f46d 作者时间（11-13T16:44+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "990f46d"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。第一条的乐观重命名设计规范全量原文未留存（会话摘要仅存指令短语与括注）；本条为复原。"
+}

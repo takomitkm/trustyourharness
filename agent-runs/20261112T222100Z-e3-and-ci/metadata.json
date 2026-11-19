@@ -1,0 +1,28 @@
+{
+  "id": "20261112T222100Z",
+  "title": "main 合并 + E3a–E3d（菜单/附件/IDB/网络 E2E）+ 双 CI 建立与按额度关停",
+  "created_at_utc": "2026-11-12T22:21:00Z",
+  "reconstructed": true,
+  "time_basis": "锚点提交 ec69e7c 作者时间（11-13T06:21+08）",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "WebFetch"
+  ],
+  "related_commits": [
+    "7564327",
+    "ec69e7c",
+    "fcd2b74",
+    "10889d1",
+    "c914293",
+    "e9b29c6",
+    "04136f8",
+    "76219d3"
+  ],
+  "task_status": "completed",
+  "notes": "回填条目（backfill），由会话记录复原。第 1 条\"1，4\"为编号选项指令；原文措辞以会话摘要为准。"
+}
