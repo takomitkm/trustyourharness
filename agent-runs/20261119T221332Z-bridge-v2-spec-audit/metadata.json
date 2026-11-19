@@ -1,0 +1,11 @@
+{
+  "id": "20261119T221332Z",
+  "title": "Bridge V2 四层数据模型外部规格：存档 + 五断言源码核对（实施待拍板）",
+  "created_at_utc": "2026-11-19T22:13:32Z",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": ["Bash", "Read", "Write", "Edit"],
+  "related_commits": ["1ea9c94"],
+  "task_status": "completed",
+  "notes": "本 Run 的原始输入=用户粘贴的外部实施规格（无附带文字），已逐字节存档于 docs/notes/composer-bridge-v2-spec-original.md（工作提交 1ea9c94）；规格的架构重构（Phase A–E）尚未实施，待用户拍板。"
+}
