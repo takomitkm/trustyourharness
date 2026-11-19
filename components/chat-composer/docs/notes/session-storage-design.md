@@ -10,6 +10,11 @@
     其余公开资料级）
 - **结论一句话**：OpenCode V2 的类型化序列 + Codex/DSH 的追加式归档 + Signal 的载荷出列 +
   Telegram 的轻量预览 + Matrix 的状态快照思想 + XMPP 的明确分页终点。
+- **具体化（2026-11-19）**：外部 HSF 规格蒸馏成两页——表结构与关系见
+  [hsf-data-model.md](hsf-data-model.md)，实现方必须遵守的契约见
+  [hsf-protocol.md](hsf-protocol.md)；两页均为 Draft、未排期。规格原文全文逐字节存档于
+  [hsf-spec-1.0-draft-full.md](hsf-spec-1.0-draft-full.md)（含完整 DDL、P0–P4 实施顺序与压测矩阵），
+  蒸馏稿若有偏差以原文为准。
 
 ## 六层结构
 
