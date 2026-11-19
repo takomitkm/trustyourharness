@@ -1,0 +1,16 @@
+{
+  "id": "20261119T214834Z",
+  "title": "agent-runs 运行台账建制（首个 Run，自记录本次操作）",
+  "created_at_utc": "2026-11-19T21:48:34Z",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit"
+  ],
+  "related_commits": [],
+  "task_status": "completed",
+  "notes": "本次无独立工作提交（建制本身即台账内容）；载体（台账）提交信息含本 Run ID，按 README 自指规避条款不回填 sha"
+}
