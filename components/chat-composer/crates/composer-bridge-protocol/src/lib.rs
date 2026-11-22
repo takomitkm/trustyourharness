@@ -17,6 +17,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+/// Bridge DTO V2（四层模型规格 §4）：独立协议层，不依赖 composer-core；
+/// 与 V1 并存直至全部 Host 迁移（规格 §9）。见 `v2::PROTOCOL_VERSION`。
+pub mod v2;
+
 /// 协议版本：DTO 形状变化必须递增，宿主按此兼容。
 pub const PROTOCOL_VERSION: u32 = 1;
 
@@ -227,17 +231,27 @@ impl BridgeCore {
     }
 
     /// Effect 回执入口（幂等：重复/未知引用显式报错，不重复提交事务）。
+    ///
+    /// 引用消费纪律（Bridge V2 规格 §8）：先取引用并完成映射校验，**成功后才消费**——
+    /// 错误形状的回执不得吞掉 ref_id（修复前：OutcomeMismatch 时引用已被摘除，
+    /// 随后到达的正确回执只能得到 UnknownRef）。`persist_revision` 只在映射成功
+    /// 且 `Persisted { ok: true }` 后递增（递增时机与验证绑定，规格 §8）。
     pub fn ack(
         &mut self,
         ref_id: u64,
         outcome: EffectOutcomeDto,
     ) -> Result<DispatchResultDto, AckError> {
-        let effect = self.pending.remove(&ref_id).ok_or(AckError::UnknownRef)?;
-        if matches!((&effect, &outcome), (Effect::Persist(_), EffectOutcomeDto::Persisted { ok: true })) {
+        let effect = self.pending.get(&ref_id).ok_or(AckError::UnknownRef)?.clone();
+        let persist_success = matches!(
+            (&effect, &outcome),
+            (Effect::Persist(_), EffectOutcomeDto::Persisted { ok: true })
+        );
+        let internal = map_outcome(&effect, outcome).ok_or(AckError::OutcomeMismatch)?;
+        self.pending.remove(&ref_id);
+        if persist_success {
             // 落盘成功：CAS 修订前移。ok=false（冲突/失败）不递增——宿主用同一 expected 重试（FM23）。
             self.persist_revision += 1;
         }
-        let internal = map_outcome(&effect, outcome).ok_or(AckError::OutcomeMismatch)?;
         Ok(self.run(internal))
     }
 
@@ -564,6 +578,159 @@ mod tests {
             ),
             Err(AckError::OutcomeMismatch)
         );
+    }
+
+    /// BM03b（规格 §8 测试 2/3）：错误形状的 ACK 不消费引用，随后正确 ACK 成功。
+    #[test]
+    fn bm03b_mismatched_ack_keeps_ref_for_later_correct_ack() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        assert_eq!(bridge.pending_effect_count(), 1);
+        assert_eq!(
+            bridge.ack(
+                1,
+                EffectOutcomeDto::Delivered {
+                    result: accepted("x", "t")
+                }
+            ),
+            Err(AckError::OutcomeMismatch)
+        );
+        assert_eq!(
+            bridge.pending_effect_count(),
+            1,
+            "错误 ACK 不消费 ref_id（§8 修复前此处为 0）"
+        );
+        let result = bridge
+            .ack(1, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        assert_eq!(result.effects.len(), 0);
+        assert_eq!(bridge.pending_effect_count(), 0, "正确 ACK 正常消费");
+    }
+
+    /// BM03c（规格 §8 测试 1）：错误形状 → OutcomeMismatch（TimedOut 回 Persist 引用）。
+    #[test]
+    fn bm03c_wrong_shape_is_outcome_mismatch() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        assert_eq!(
+            bridge.ack(1, EffectOutcomeDto::TimedOut),
+            Err(AckError::OutcomeMismatch)
+        );
+    }
+
+    /// BM03d（规格 §8 测试 4）：成功 ACK 消费引用后，重复 ACK 得 UnknownRef，
+    /// 状态不再变化（consume-once，不重放事务）。
+    #[test]
+    fn bm03d_correct_ack_cannot_reapply_transition() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        let first = bridge
+            .ack(1, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        let revision_after = first.snapshot.revision;
+        assert_eq!(
+            bridge.ack(1, EffectOutcomeDto::Persisted { ok: true }),
+            Err(AckError::UnknownRef)
+        );
+        assert_eq!(bridge.snapshot().revision, revision_after);
+    }
+
+    /// BM03e（规格 §8 测试 5）：未知 ref_id 不改变任何状态。
+    #[test]
+    fn bm03e_unknown_ref_leaves_state_unchanged() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        let before = bridge.snapshot();
+        assert_eq!(
+            bridge.ack(99, EffectOutcomeDto::Persisted { ok: true }),
+            Err(AckError::UnknownRef)
+        );
+        let after = bridge.snapshot();
+        assert_eq!(after.revision, before.revision);
+        assert_eq!(after.state.draft, before.state.draft);
+        assert_eq!(after.state.submissions, before.state.submissions);
+        assert_eq!(bridge.pending_effect_count(), 1);
+    }
+
+    /// BM03f（规格 §8 测试 6）：不匹配的 Receipt 不能导致 Accepted——core 的
+    /// validate_result 把身份错配的回执结算为 Uncertain，而不是放行。
+    #[test]
+    fn bm03f_mismatched_receipt_becomes_uncertain_not_accepted() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        bridge
+            .ack(1, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        let submit = bridge.dispatch(ComposerEventDto::Submit);
+        let persist_ref = submit
+            .effects
+            .iter()
+            .find(|effect| matches!(effect.effect, EffectDto::Persist { .. }))
+            .unwrap();
+        let delivered = bridge
+            .ack(persist_ref.ref_id, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        let deliver_ref = delivered
+            .effects
+            .iter()
+            .find(|effect| matches!(effect.effect, EffectDto::Deliver { .. }))
+            .expect("派发引用");
+        // 回执带别人的消息 ID。
+        let settled = bridge
+            .ack(
+                deliver_ref.ref_id,
+                EffectOutcomeDto::Delivered {
+                    result: accepted("m-other", "turn-1"),
+                },
+            )
+            .unwrap();
+        assert_ne!(
+            settled.snapshot.state.submissions[0].status,
+            Status::Accepted,
+            "身份错配的回执不得通过成 Accepted"
+        );
+        assert_eq!(
+            settled.snapshot.state.submissions[0].status,
+            Status::Uncertain
+        );
+    }
+
+    /// BM03g（规格 §8 测试 7）：回执必须匹配原始 Effect 身份——同链路正确身份
+    /// 的回执才能 Accepted（BM03f 的正例对照）。
+    #[test]
+    fn bm03g_matching_receipt_settles_accepted() {
+        let mut bridge = bridge();
+        bridge.dispatch(ComposerEventDto::Edit { text: "A".into() });
+        bridge
+            .ack(1, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        let submit = bridge.dispatch(ComposerEventDto::Submit);
+        let persist_ref = submit
+            .effects
+            .iter()
+            .find(|effect| matches!(effect.effect, EffectDto::Persist { .. }))
+            .unwrap();
+        let delivered = bridge
+            .ack(persist_ref.ref_id, EffectOutcomeDto::Persisted { ok: true })
+            .unwrap();
+        let deliver_ref = delivered
+            .effects
+            .iter()
+            .find(|effect| matches!(effect.effect, EffectDto::Deliver { .. }))
+            .expect("派发引用");
+        let message_id = match &deliver_ref.effect {
+            EffectDto::Deliver { id, .. } => id.clone(),
+            _ => unreachable!(),
+        };
+        let settled = bridge
+            .ack(
+                deliver_ref.ref_id,
+                EffectOutcomeDto::Delivered {
+                    result: accepted(&message_id, "turn-1"),
+                },
+            )
+            .unwrap();
+        assert_eq!(settled.snapshot.state.submissions[0].status, Status::Accepted);
     }
 
     /// BM04：超时路径——ScheduleTimeout ack TimedOut → unknown（FM04），阻塞队列（FM09）。

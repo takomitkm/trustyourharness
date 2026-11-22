@@ -7,5 +7,6 @@
 //! 旧的 wasm-bindgen 导出（archive/rust/src/wasm.rs）已被 Dioxus web 运行时取代：
 //! Web 目标下整个 core 直接编译进应用 WASM，不再单独暴露 JS 门面。
 
+pub mod content;
 pub mod ids;
 pub mod state;

@@ -26,6 +26,22 @@ pub struct TurnId(String);
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ScopeId(String);
 
+/// Identifies one logical attachment within the composer content model.
+///
+/// Session-scoped logical identity — deliberately NOT a content hash: the same
+/// file dropped into two scopes yields two AssetIds sharing one blob (D002 边界
+/// 与四层模型规格 §2.4；BlobHash 属于持久化/BlobStore 层，不在本 crate）。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct AssetId(String);
+
+/// Identifies one structured external reference (mention/citation target).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ReferenceId(String);
+
+/// Identifies one node inside a `ComposerDocument`（内容层节点身份，编辑器无关）。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DocumentNodeId(String);
+
 macro_rules! id_type {
     ($($name:ident),+ $(,)?) => {
         $(
@@ -49,7 +65,7 @@ macro_rules! id_type {
     };
 }
 
-id_type!(MessageId, AttemptId, GenerationId, TurnId, ScopeId);
+id_type!(MessageId, AttemptId, GenerationId, TurnId, ScopeId, AssetId, ReferenceId, DocumentNodeId);
 
 /// Lifecycle of one message in the durable outbox.
 ///
