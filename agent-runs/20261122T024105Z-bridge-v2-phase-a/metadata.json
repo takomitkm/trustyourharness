@@ -1,0 +1,11 @@
+{
+  "id": "20261122T024105Z",
+  "title": "Bridge V2 Phase A：四层模型类型定义 + ack 引用消费修复（规格 §1 审计 + Phase A 全交付）",
+  "created_at_utc": "2026-11-22T02:41:05Z",
+  "agent": "ZCode",
+  "model": "zai-api/GLM-5.3-Flash",
+  "tools": ["Bash", "Read", "Write", "Edit", "ssh"],
+  "related_commits": ["d349b47"],
+  "task_status": "completed",
+  "notes": "用户重贴 Bridge V2 规格=开工信号（按规格自带 Phase A→E 顺序；L4 按本地修正 taino 优先）。载体工作提交 d349b47（amend 含 4 个构建期修复）；台账提交含本文件。Phase B-E 后续轮次。"
+}
